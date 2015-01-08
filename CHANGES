@@ -1,6 +1,12 @@
 Babel Changelog
 ===============
 
+Version 2.0-lexicograph
+-----------------------
+
+- Fixed get_timezone_gmt so that it works with newer pytz
+- Documented all valid keys for get_global()
+
 Version 2.0
 -----------
 
