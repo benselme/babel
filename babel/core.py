@@ -73,6 +73,12 @@ LOCALE_ALIASES = {
 }
 
 
+ROOT_LOCALE = "root"
+UNDEFINED_LANGUAGE = "und"
+UNDEFINED_SCRIPT = "Zzzz"
+UNDEFINED_REGION = "ZZ"
+
+
 class UnknownLocaleError(Exception):
     """Exception thrown when a locale is requested for which no locale data
     is available.
@@ -288,9 +294,9 @@ class Locale(object):
         script = get_global('script_aliases').get(script, script)
         variant = get_global('variant_aliases').get(variant, variant)
 
-        if territory == 'ZZ':
+        if territory == UNDEFINED_REGION:
             territory = None
-        if script == 'Zzzz':
+        if script == UNDEFINED_SCRIPT:
             script = None
 
         parts = language, territory, script, variant
@@ -941,3 +947,32 @@ def get_locale_identifier(tup, sep='_'):
     tup = tuple(tup[:4])
     lang, territory, script, variant = tup + (None,) * (4 - len(tup))
     return sep.join(filter(None, (lang, script, territory, variant)))
+
+
+def build_locale_identifier(lang=None, script=None, territory=None,
+                            variant=None, alternate_tag=None):
+    """Build a locale identifier from the supplied parameters, as specified in
+    the `Unicode LDML standard
+    <http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers>`.
+
+    .. versionadded:: 2.0
+
+    :param lang: the language subtag. If None, will default to "root", or "und"
+                 if a territory or script is specified
+    :param script: the script subtag
+    :param territory: the territory code subtag
+    :param variant: the language variant code
+    :param alternate_tag: if present, the subtags not specified in the params
+                          will be copied from this tag
+    :return: the locale identifier string
+    """
+    alt_lang, alt_territory, alt_script, alt_variant = (
+        parse_locale(alternate_tag) if alternate_tag
+        else (None, None, None, None))
+    parts = [lang or alt_lang or (UNDEFINED_LANGUAGE if territory or script
+                                  else ROOT_LOCALE)]
+    get_part = lambda part, alt_part:  part or alt_part or None
+    parts.extend(filter(None, (get_part(*data) for data in (
+        (script, alt_script), (territory, alt_territory),
+        (variant, alt_variant)))))
+    return '_'.join(parts)

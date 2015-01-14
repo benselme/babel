@@ -16,7 +16,8 @@ import unittest
 import pytest
 
 from babel import core, Locale
-from babel.core import default_locale, Locale
+from babel.core import default_locale, Locale, UNDEFINED_LANGUAGE, \
+    UNDEFINED_SCRIPT, UNDEFINED_REGION, build_locale_identifier, ROOT_LOCALE
 
 
 def test_locale_provides_access_to_cldr_locale_data():
@@ -269,3 +270,25 @@ def test_parse_locale():
     assert core.parse_locale('en_US.UTF-8') == ('en', 'US', None, None)
     assert (core.parse_locale('de_DE.iso885915@euro') ==
             ('de', 'DE', None, None))
+
+
+class CreateTagStringTestCase(unittest.TestCase):
+    def test_all_empty(self):
+        assert build_locale_identifier() == ROOT_LOCALE
+
+    def test_no_lang_with_territory(self):
+        assert build_locale_identifier(territory='US') == \
+            UNDEFINED_LANGUAGE + '_US'
+
+    def test_no_lang_with_script(self):
+        assert build_locale_identifier(script='Latn') == \
+            UNDEFINED_LANGUAGE + '_Latn'
+
+    def test_lang_script_territory(self):
+        assert build_locale_identifier(lang="zh", territory="TW",
+                                       script='Hant') == 'zh_Hant_TW'
+
+    def test_no_lang_with_territory_and_alt(self):
+        assert build_locale_identifier(territory="TW",
+                                       alternate_tag='zh_Hant_TW') \
+            == 'zh_Hant_TW'
