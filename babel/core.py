@@ -976,3 +976,55 @@ def build_locale_identifier(lang=None, script=None, territory=None,
         (script, alt_script), (territory, alt_territory),
         (variant, alt_variant)))))
     return '_'.join(parts)
+
+
+def _get_likely_subtag(locale_id):
+    return get_global('likely_subtags').get(locale_id)
+
+
+def canonicalize_locale_id(locale_id):
+    """Canonicalize locale id as per "Add Likely subtags process" described
+    in http://www.unicode.org/reports/tr35/#Likely_Subtags
+
+    :param locale_id: The locale identtifier to be canonicalized
+    :return: The canonicalized locale identifier
+
+    """
+    # 1. Make sure the input locale is in canonical form: uses the right
+    # separator, and has the right casing.
+    language, territory, script, variant = tup = parse_locale(locale_id)
+
+    # 2. Replace any deprecated subtags with their canonical values using the
+    # <alias> data in supplemental metadata. Use the first value in the
+    # replacement list, if it exists. Language tag replacements may have
+    # multiple parts, such as "sh" ➞ "sr_Latn" or mo" ➞ "ro_MD". In such a case,
+    # the original script and/or region are retained if there is one.
+    # Thus "sh_Arab_AQ" ➞ "sr_Arab_AQ", not "sr_Latn_AQ".
+
+    language_alias = get_global('language_aliases').get(language)
+    if language_alias:
+        alias_tup = parse_locale(language_alias)
+        tup = alias_tup[:1] + tup[1:]
+        language, territory, script, variant = [
+            a or b for (a, b) in zip(tup, alias_tup)]
+
+    territory = get_global('territory_aliases').get(territory, (territory,))[0]
+    script = get_global('script_aliases').get(script, script)
+    variant = get_global('variant_aliases').get(variant, variant)
+
+    # 3. If the tag is grandfathered (see <variable id="$grandfathered"
+    # type="choice"> in the supplemental data), then return it.
+    # ***makes no sense AFAICT since no grandfathered tag would make it to
+    # here***
+    intermediate_id = build_locale_identifier(language, script, territory,
+                                              variant)
+    if intermediate_id in get_global('validity_data')['$grandfathered']:
+        return intermediate_id
+
+    # 4. Remove the script code 'Zzzz' and the region code 'ZZ' if they occur.
+    script = None if script == UNDEFINED_SCRIPT else script
+    territory = None if territory == UNDEFINED_REGION else territory
+
+    # 5. Get the components of the cleaned-up source tag (languages, scripts,
+    # and regions), plus any variants and extensions.
+    return build_locale_identifier(language, script, territory, variant)

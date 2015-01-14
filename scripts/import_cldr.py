@@ -143,6 +143,7 @@ def main():
         territory_aliases = global_data.setdefault('territory_aliases', {})
         script_aliases = global_data.setdefault('script_aliases', {})
         variant_aliases = global_data.setdefault('variant_aliases', {})
+        validity_data = global_data.setdefault('validity_data', {})
         likely_subtags = global_data.setdefault('likely_subtags', {})
         territory_currencies = global_data.setdefault('territory_currencies', {})
 
@@ -203,6 +204,18 @@ def main():
             repl = alias.attrib.get('replacement')
             if repl:
                 variant_aliases[alias.attrib['type']] = repl
+
+        # validity data
+        for variable in sup_metadata.findall('.//validity/variable'):
+            variable_id = variable.attrib['id']
+            variable_type = variable.attrib['type']
+            # For now, we only handle only 'choice' but see
+            # http://unicode.org/reports/tr35/#Valid_Attribute_Values
+            if variable_type == 'choice':
+                variable_text = text_type(variable.text)
+                if id == '$grandfathered':
+                    variable_text = variable_text.replace('-', '_')
+                validity_data[variable_id] = set(variable_text.split())
 
         # Likely subtags
         for likely_subtag in sup_likely.findall('.//likelySubtags/likelySubtag'):

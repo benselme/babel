@@ -17,7 +17,8 @@ import pytest
 
 from babel import core, Locale
 from babel.core import default_locale, Locale, UNDEFINED_LANGUAGE, \
-    UNDEFINED_SCRIPT, UNDEFINED_REGION, build_locale_identifier, ROOT_LOCALE
+    UNDEFINED_SCRIPT, UNDEFINED_REGION, build_locale_identifier, ROOT_LOCALE, \
+    canonicalize_locale_id
 
 
 def test_locale_provides_access_to_cldr_locale_data():
@@ -292,3 +293,33 @@ class CreateTagStringTestCase(unittest.TestCase):
         assert build_locale_identifier(territory="TW",
                                        alternate_tag='zh_Hant_TW') \
             == 'zh_Hant_TW'
+
+
+class CanonicalizeTestCase(unittest.TestCase):
+    def test_no_change_lang_territory(self):
+        assert canonicalize_locale_id('fr_FR') == 'fr_FR'
+
+    def test_no_change_lang_script_terrritory(self):
+        assert canonicalize_locale_id('fr_Latn_FR') == 'fr_Latn_FR'
+
+    def test_replace_deprecated_lang(self):
+        assert canonicalize_locale_id('iw') == 'he'
+
+    def test_dont_replace_script(self):
+        """Don't replace script if the original tag already has one, and
+        the canonical tag supplied by language_aliases has another."""
+        assert canonicalize_locale_id('hbs_Arab') == 'sr_Arab'
+
+    def test_get_script_from_alias(self):
+        """Keep script if provided by language alias."""
+        assert canonicalize_locale_id('hbs_SR') == 'sr_Latn_SR'
+
+    # def test_grandfathered_returned_as_is(self):
+    #     assert canonicalize_locale_id('en_GB_oed') == 'en_GB_oed'
+
+    def test_remove_unknown_script(self):
+        assert canonicalize_locale_id('fr_{0}'.format(UNDEFINED_SCRIPT)) == 'fr'
+
+    def test_remove_unknown_territory(self):
+        """Keep script if provided by language alias."""
+        assert canonicalize_locale_id('fr_{0}'.format(UNDEFINED_REGION)) == 'fr'
