@@ -44,9 +44,11 @@ def get_global(key):
     >>> get_global('zone_territories')['Europe/Berlin']
     u'DE'
 
-    The keys available are ``language_aliases``, ``likely_subtags``, ``script_aliases``, ``territory_aliases``,
-    ``territory_currencies``, ``territory_languages``, ``territory_zones``, ``variant_aliases``, ``win_mapping``,
-    ``zone_aliases`` and ``zone_territories``.
+    The keys available are ``language_aliases``, ``likely_subtags``,
+    ``script_aliases``, ``territory_aliases``, ``territory_currencies``,
+    ``territory_languages``, ``territory_zones``, ``validity_data``,
+     ``variant_aliases``, ``win_mapping``, ``zone_aliases`` and
+     ``zone_territories``.
 
     .. versionadded:: 0.9
 
