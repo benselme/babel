@@ -978,8 +978,12 @@ def build_locale_identifier(lang=None, script=None, territory=None,
     return '_'.join(parts)
 
 
-def _get_likely_subtag(locale_id):
+def _get_likely_subtags(locale_id):
     return get_global('likely_subtags').get(locale_id)
+
+
+def _replace_empty_subtags(subtags, alt_subtags):
+    return tuple(a or b for (a, b) in zip(subtags, alt_subtags))
 
 
 def canonicalize_locale_id(locale_id):
@@ -992,6 +996,7 @@ def canonicalize_locale_id(locale_id):
     """
     # 1. Make sure the input locale is in canonical form: uses the right
     # separator, and has the right casing.
+    locale_id = locale_id.replace('-', '_')
     language, territory, script, variant = tup = parse_locale(locale_id)
 
     # 2. Replace any deprecated subtags with their canonical values using the
@@ -1005,9 +1010,8 @@ def canonicalize_locale_id(locale_id):
     if language_alias:
         alias_tup = parse_locale(language_alias)
         tup = alias_tup[:1] + tup[1:]
-        language, territory, script, variant = [
-            a or b for (a, b) in zip(tup, alias_tup)]
-
+        language, territory, script, variant = _replace_empty_subtags(tup,
+                                                                      alias_tup)
     territory = get_global('territory_aliases').get(territory, (territory,))[0]
     script = get_global('script_aliases').get(script, script)
     variant = get_global('variant_aliases').get(variant, variant)
@@ -1027,4 +1031,34 @@ def canonicalize_locale_id(locale_id):
 
     # 5. Get the components of the cleaned-up source tag (languages, scripts,
     # and regions), plus any variants and extensions.
-    return build_locale_identifier(language, script, territory, variant)
+    return language, script, territory, variant
+
+
+def _lookup_likely_subtags(language, script, territory):
+    combinations = ((language, script, territory),
+                    (language, None, territory),
+                    (language, script, None),
+                    (language, None, None),
+                    (UNDEFINED_LANGUAGE, script, None))
+    iter_tags = (_get_likely_subtags(build_locale_identifier(*combination))
+                 for combination in combinations)
+    return next(filter(None, iter_tags), None)
+
+
+def add_likely_subtags(locale_id):
+    """Given a locale_id, find the likely subtags and return a tuple where
+    empty subtags are replaced by their most likely value, as per `this process
+    <http://www.unicode.org/reports/tr35/#Likely_Subtags>`.
+
+    :param locale_id:
+    :return:
+    """
+    language, script, territory, variant = canonicalize_locale_id(locale_id)
+    match = _lookup_likely_subtags(language, script, territory)
+    if match:
+        lang_m, terr_m, script_m, _ = parse_locale(match)
+        language, script, territory = _replace_empty_subtags(
+            (language, script, territory),
+            (lang_m, script_m, terr_m))
+    return language, script, territory, variant
+
