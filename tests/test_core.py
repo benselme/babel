@@ -18,7 +18,7 @@ from babel import core, Locale
 from babel.core import (
     default_locale, UNDEFINED_LANGUAGE, UNDEFINED_SCRIPT,
     UNDEFINED_REGION, build_locale_identifier, ROOT_LOCALE,
-    canonicalize_locale_id, add_likely_subtags)
+    canonicalize_locale_id, add_likely_subtags, remove_likely_subtags)
 
 
 def test_locale_provides_access_to_cldr_locale_data():
@@ -340,3 +340,19 @@ ADD_LIKELY_TESTS = (
 @pytest.mark.parametrize('locale_id,maximized', ADD_LIKELY_TESTS)
 def test_add_likely_subtags(locale_id, maximized):
     assert build_locale_identifier(*add_likely_subtags(locale_id)) == maximized
+
+
+REMOVE_LIKELY_TESTS = (
+    ('zh_Hant', 'zh_TW'),
+    ('en_Latn_US', 'en'),
+    ('fr_FR', 'fr'),
+    ('fr_Latn_CA', 'fr_CA'),
+    ('ar_EG', 'ar'),
+    ('en_CA', 'en_CA'),
+)
+
+
+@pytest.mark.parametrize('locale_id,minimized', REMOVE_LIKELY_TESTS)
+def test_remove_likely_subtags(locale_id, minimized):
+    assert build_locale_identifier(*remove_likely_subtags(locale_id)) \
+        == minimized

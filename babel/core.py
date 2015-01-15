@@ -12,8 +12,9 @@
 import os
 
 from babel import localedata
-from babel._compat import pickle, string_types
+from babel._compat import pickle, string_types, ifilter
 from babel.plural import PluralRule
+
 
 __all__ = ['UnknownLocaleError', 'Locale', 'default_locale', 'negotiate_locale',
            'parse_locale']
@@ -993,6 +994,8 @@ def canonicalize_locale_id(locale_id):
     :param locale_id: The locale identtifier to be canonicalized
     :return: The canonicalized locale identifier
 
+    .. versionadded:: 2.0
+
     """
     # 1. Make sure the input locale is in canonical form: uses the right
     # separator, and has the right casing.
@@ -1042,16 +1045,20 @@ def _lookup_likely_subtags(language, script, territory):
                     (UNDEFINED_LANGUAGE, script, None))
     iter_tags = (_get_likely_subtags(build_locale_identifier(*combination))
                  for combination in combinations)
-    return next(filter(None, iter_tags), None)
+    return next(ifilter(None, iter_tags), None)
 
 
 def add_likely_subtags(locale_id):
-    """Given a locale_id, find the likely subtags and return a tuple where
-    empty subtags are replaced by their most likely value, as per `this process
+    """Maximize a locale identifier: given a locale_id, find the likely subtags
+    and return a tuple where empty subtags are replaced by their most likely
+    value, as per `this process
     <http://www.unicode.org/reports/tr35/#Likely_Subtags>`.
 
-    :param locale_id:
-    :return:
+    :param locale_id: The locale identifier to maximize
+    :return: A tuple of (language, script, territory, variant)
+
+    .. versionadded:: 2.0
+
     """
     language, script, territory, variant = canonicalize_locale_id(locale_id)
     match = _lookup_likely_subtags(language, script, territory)
@@ -1062,3 +1069,27 @@ def add_likely_subtags(locale_id):
             (lang_m, script_m, terr_m))
     return language, script, territory, variant
 
+
+def remove_likely_subtags(locale_id):
+    """Minimize a locale identifier: Given a locale, remove any fields that
+    ``add_likely_subtags`` would add.
+
+    :param locale_id: The locale identifier to maximize
+    :return: A tuple of (language, script, territory, variant)
+
+    .. versionadded:: 2.0
+
+    """
+    lang, script, terr, variant = canonicalize_locale_id(locale_id)
+    max_subtags = add_likely_subtags(locale_id)
+    max_lang, max_script, max_terr, max_variant = max_subtags
+    combinations = (
+        (max_lang, None, None),
+        (max_lang, None, max_terr),
+        (max_lang, max_script, None)
+    )
+    for combination in combinations:
+        likely = add_likely_subtags(build_locale_identifier(*combination))
+        if likely[:3] == (max_lang, max_script, max_terr):
+            return combination + (variant, )
+    return max_subtags
