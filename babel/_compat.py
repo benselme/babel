@@ -1,5 +1,6 @@
 import sys
 import array
+import itertools
 
 PY2 = sys.version_info[0] == 2
 
@@ -17,6 +18,7 @@ if not PY2:
     iterkeys = lambda d: iter(d.keys())
     itervalues = lambda d: iter(d.values())
     iteritems = lambda d: iter(d.items())
+    ifilter = filter
 
     from io import StringIO, BytesIO
     import pickle
@@ -40,6 +42,7 @@ else:
     iterkeys = lambda d: d.iterkeys()
     itervalues = lambda d: d.itervalues()
     iteritems = lambda d: d.iteritems()
+    ifilter = itertools.ifilter
 
     from cStringIO import StringIO as BytesIO
     from StringIO import StringIO

@@ -11,12 +11,14 @@
 # individuals. For the exact contribution history, see the revision
 # history and logs, available at http://babel.edgewall.org/log/.
 
-import doctest
 import unittest
 import pytest
 
 from babel import core, Locale
-from babel.core import default_locale, Locale
+from babel.core import (
+    default_locale, UNDEFINED_LANGUAGE, UNDEFINED_SCRIPT,
+    UNDEFINED_REGION, build_locale_identifier, ROOT_LOCALE,
+    canonicalize_locale_id, add_likely_subtags, remove_likely_subtags)
 
 
 def test_locale_provides_access_to_cldr_locale_data():
@@ -269,3 +271,88 @@ def test_parse_locale():
     assert core.parse_locale('en_US.UTF-8') == ('en', 'US', None, None)
     assert (core.parse_locale('de_DE.iso885915@euro') ==
             ('de', 'DE', None, None))
+
+
+class CreateTagStringTestCase(unittest.TestCase):
+    def test_all_empty(self):
+        assert build_locale_identifier() == ROOT_LOCALE
+
+    def test_no_lang_with_territory(self):
+        assert build_locale_identifier(territory='US') == \
+            UNDEFINED_LANGUAGE + '_US'
+
+    def test_no_lang_with_script(self):
+        assert build_locale_identifier(script='Latn') == \
+            UNDEFINED_LANGUAGE + '_Latn'
+
+    def test_lang_script_territory(self):
+        assert build_locale_identifier(lang="zh", territory="TW",
+                                       script='Hant') == 'zh_Hant_TW'
+
+    def test_no_lang_with_territory_and_alt(self):
+        assert build_locale_identifier(territory="TW",
+                                       alternate_tag='zh_Hant_TW') \
+            == 'zh_Hant_TW'
+
+
+class CanonicalizeTestCase(unittest.TestCase):
+    def canonicalize(self, locale_id):
+        return build_locale_identifier(*canonicalize_locale_id(locale_id))
+        
+    def test_no_change_lang_territory(self):
+        assert self.canonicalize('fr_FR') == 'fr_FR'
+
+    def test_no_change_lang_script_terrritory(self):
+        assert self.canonicalize('fr_Latn_FR') == 'fr_Latn_FR'
+
+    def test_replace_deprecated_lang(self):
+        assert self.canonicalize('iw') == 'he'
+
+    def test_dont_replace_script(self):
+        """Don't replace script if the original tag already has one, and
+        the canonical tag supplied by language_aliases has another."""
+        assert self.canonicalize('hbs_Arab') == 'sr_Arab'
+
+    def test_get_script_from_alias(self):
+        """Keep script if provided by language alias."""
+        assert self.canonicalize('hbs_SR') == 'sr_Latn_SR'
+
+    # def test_grandfathered_returned_as_is(self):
+    #     assert canonicalize_locale_id('en_GB_oed') == 'en_GB_oed'
+
+    def test_remove_unknown_script(self):
+        assert self.canonicalize('fr_' + UNDEFINED_SCRIPT) == 'fr'
+
+    def test_remove_unknown_territory(self):
+        """Keep script if provided by language alias."""
+        assert self.canonicalize('fr_' + UNDEFINED_REGION) == 'fr'
+
+
+ADD_LIKELY_TESTS = (
+    ('fr', 'fr_Latn_FR'),
+    ('fr_Latn', 'fr_Latn_FR'),
+    ('fr_Latn_FR', 'fr_Latn_FR'),
+    ('fr_Latn_FR', 'fr_Latn_FR'),
+    ('ZH-ZZZZ-SG', 'zh_Hans_SG')
+)
+
+
+@pytest.mark.parametrize('locale_id,maximized', ADD_LIKELY_TESTS)
+def test_add_likely_subtags(locale_id, maximized):
+    assert build_locale_identifier(*add_likely_subtags(locale_id)) == maximized
+
+
+REMOVE_LIKELY_TESTS = (
+    ('zh_Hant', 'zh_TW'),
+    ('en_Latn_US', 'en'),
+    ('fr_FR', 'fr'),
+    ('fr_Latn_CA', 'fr_CA'),
+    ('ar_EG', 'ar'),
+    ('en_CA', 'en_CA'),
+)
+
+
+@pytest.mark.parametrize('locale_id,minimized', REMOVE_LIKELY_TESTS)
+def test_remove_likely_subtags(locale_id, minimized):
+    assert build_locale_identifier(*remove_likely_subtags(locale_id)) \
+        == minimized

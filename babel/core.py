@@ -12,8 +12,9 @@
 import os
 
 from babel import localedata
-from babel._compat import pickle, string_types
+from babel._compat import pickle, string_types, ifilter
 from babel.plural import PluralRule
+
 
 __all__ = ['UnknownLocaleError', 'Locale', 'default_locale', 'negotiate_locale',
            'parse_locale']
@@ -75,6 +76,12 @@ LOCALE_ALIASES = {
     'pt': 'pt_PT', 'ro': 'ro_RO', 'ru': 'ru_RU', 'sk': 'sk_SK', 'sl': 'sl_SI',
     'sv': 'sv_SE', 'th': 'th_TH', 'tr': 'tr_TR', 'uk': 'uk_UA'
 }
+
+
+ROOT_LOCALE = "root"
+UNDEFINED_LANGUAGE = "und"
+UNDEFINED_SCRIPT = "Zzzz"
+UNDEFINED_REGION = "ZZ"
 
 
 class UnknownLocaleError(Exception):
@@ -292,9 +299,9 @@ class Locale(object):
         script = get_global('script_aliases').get(script, script)
         variant = get_global('variant_aliases').get(variant, variant)
 
-        if territory == 'ZZ':
+        if territory == UNDEFINED_REGION:
             territory = None
-        if script == 'Zzzz':
+        if script == UNDEFINED_SCRIPT:
             script = None
 
         parts = language, territory, script, variant
@@ -945,3 +952,148 @@ def get_locale_identifier(tup, sep='_'):
     tup = tuple(tup[:4])
     lang, territory, script, variant = tup + (None,) * (4 - len(tup))
     return sep.join(filter(None, (lang, script, territory, variant)))
+
+
+def build_locale_identifier(lang=None, script=None, territory=None,
+                            variant=None, alternate_tag=None):
+    """Build a locale identifier from the supplied parameters, as specified in
+    the `Unicode LDML standard
+    <http://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers>`.
+
+    .. versionadded:: 2.0
+
+    :param lang: the language subtag. If None, will default to "root", or "und"
+                 if a territory or script is specified
+    :param script: the script subtag
+    :param territory: the territory code subtag
+    :param variant: the language variant code
+    :param alternate_tag: if present, the subtags not specified in the params
+                          will be copied from this tag
+    :return: the locale identifier string
+    """
+    alt_lang, alt_territory, alt_script, alt_variant = (
+        parse_locale(alternate_tag) if alternate_tag
+        else (None, None, None, None))
+    parts = [lang or alt_lang or (UNDEFINED_LANGUAGE if territory or script
+                                  else ROOT_LOCALE)]
+    get_part = lambda part, alt_part:  part or alt_part or None
+    parts.extend(filter(None, (get_part(*data) for data in (
+        (script, alt_script), (territory, alt_territory),
+        (variant, alt_variant)))))
+    return '_'.join(parts)
+
+
+def _get_likely_subtags(locale_id):
+    return get_global('likely_subtags').get(locale_id)
+
+
+def _replace_empty_subtags(subtags, alt_subtags):
+    return tuple(a or b for (a, b) in zip(subtags, alt_subtags))
+
+
+def canonicalize_locale_id(locale_id):
+    """Canonicalize locale id as per "Add Likely subtags process" described
+    in http://www.unicode.org/reports/tr35/#Likely_Subtags
+
+    :param locale_id: The locale identtifier to be canonicalized
+    :return: The canonicalized locale identifier
+
+    .. versionadded:: 2.0
+
+    """
+    # 1. Make sure the input locale is in canonical form: uses the right
+    # separator, and has the right casing.
+    locale_id = locale_id.replace('-', '_')
+    language, territory, script, variant = tup = parse_locale(locale_id)
+
+    # 2. Replace any deprecated subtags with their canonical values using the
+    # <alias> data in supplemental metadata. Use the first value in the
+    # replacement list, if it exists. Language tag replacements may have
+    # multiple parts, such as "sh" ➞ "sr_Latn" or mo" ➞ "ro_MD". In such a case,
+    # the original script and/or region are retained if there is one.
+    # Thus "sh_Arab_AQ" ➞ "sr_Arab_AQ", not "sr_Latn_AQ".
+
+    language_alias = get_global('language_aliases').get(language)
+    if language_alias:
+        alias_tup = parse_locale(language_alias)
+        tup = alias_tup[:1] + tup[1:]
+        language, territory, script, variant = _replace_empty_subtags(tup,
+                                                                      alias_tup)
+    territory = get_global('territory_aliases').get(territory, (territory,))[0]
+    script = get_global('script_aliases').get(script, script)
+    variant = get_global('variant_aliases').get(variant, variant)
+
+    # 3. If the tag is grandfathered (see <variable id="$grandfathered"
+    # type="choice"> in the supplemental data), then return it.
+    # ***makes no sense AFAICT since no grandfathered tag would make it to
+    # here***
+    intermediate_id = build_locale_identifier(language, script, territory,
+                                              variant)
+    if intermediate_id in get_global('validity_data')['$grandfathered']:
+        return intermediate_id
+
+    # 4. Remove the script code 'Zzzz' and the region code 'ZZ' if they occur.
+    script = None if script == UNDEFINED_SCRIPT else script
+    territory = None if territory == UNDEFINED_REGION else territory
+
+    # 5. Get the components of the cleaned-up source tag (languages, scripts,
+    # and regions), plus any variants and extensions.
+    return language, script, territory, variant
+
+
+def _lookup_likely_subtags(language, script, territory):
+    combinations = ((language, script, territory),
+                    (language, None, territory),
+                    (language, script, None),
+                    (language, None, None),
+                    (UNDEFINED_LANGUAGE, script, None))
+    iter_tags = (_get_likely_subtags(build_locale_identifier(*combination))
+                 for combination in combinations)
+    return next(ifilter(None, iter_tags), None)
+
+
+def add_likely_subtags(locale_id):
+    """Maximize a locale identifier: given a locale_id, find the likely subtags
+    and return a tuple where empty subtags are replaced by their most likely
+    value, as per `this process
+    <http://www.unicode.org/reports/tr35/#Likely_Subtags>`.
+
+    :param locale_id: The locale identifier to maximize
+    :return: A tuple of (language, script, territory, variant)
+
+    .. versionadded:: 2.0
+
+    """
+    language, script, territory, variant = canonicalize_locale_id(locale_id)
+    match = _lookup_likely_subtags(language, script, territory)
+    if match:
+        lang_m, terr_m, script_m, _ = parse_locale(match)
+        language, script, territory = _replace_empty_subtags(
+            (language, script, territory),
+            (lang_m, script_m, terr_m))
+    return language, script, territory, variant
+
+
+def remove_likely_subtags(locale_id):
+    """Minimize a locale identifier: Given a locale, remove any fields that
+    ``add_likely_subtags`` would add.
+
+    :param locale_id: The locale identifier to maximize
+    :return: A tuple of (language, script, territory, variant)
+
+    .. versionadded:: 2.0
+
+    """
+    lang, script, terr, variant = canonicalize_locale_id(locale_id)
+    max_subtags = add_likely_subtags(locale_id)
+    max_lang, max_script, max_terr, max_variant = max_subtags
+    combinations = (
+        (max_lang, None, None),
+        (max_lang, None, max_terr),
+        (max_lang, max_script, None)
+    )
+    for combination in combinations:
+        likely = add_likely_subtags(build_locale_identifier(*combination))
+        if likely[:3] == (max_lang, max_script, max_terr):
+            return combination + (variant, )
+    return max_subtags
