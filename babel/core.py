@@ -1064,10 +1064,13 @@ def add_likely_subtags(locale_id):
     match = _lookup_likely_subtags(language, script, territory)
     if match:
         lang_m, terr_m, script_m, _ = parse_locale(match)
-        language, script, territory = _replace_empty_subtags(
+        language = None if language == UNDEFINED_LANGUAGE else language
+        result = _replace_empty_subtags(
             (language, script, territory),
             (lang_m, script_m, terr_m))
-    return language, script, territory, variant
+    else:
+        result = _lookup_likely_subtags('und', None, None)
+    return result + (variant, )
 
 
 def remove_likely_subtags(locale_id):

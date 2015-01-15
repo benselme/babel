@@ -333,7 +333,8 @@ ADD_LIKELY_TESTS = (
     ('fr_Latn', 'fr_Latn_FR'),
     ('fr_Latn_FR', 'fr_Latn_FR'),
     ('fr_Latn_FR', 'fr_Latn_FR'),
-    ('ZH-ZZZZ-SG', 'zh_Hans_SG')
+    ('ZH-ZZZZ-SG', 'zh_Hans_SG'),
+    ('und_DE', 'de_Latn_DE'),
 )
 
 
