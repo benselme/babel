@@ -1,11 +1,13 @@
 Babel Changelog
 ===============
 
-Version 2.0-lexicograph
------------------------
+Version 2.0-lex
+---------------
 
-- Fixed get_timezone_gmt so that it works with newer pytz
-- Documented all valid keys for get_global()
+- Fixed get_timezone_gmt so that it works with newer pytz.
+- Documented all valid keys for get_global().
+- Support for CLDR v26.
+- Added support for adding and removing likely subtags from a locale identifier.
 
 Version 2.0
 -----------

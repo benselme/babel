@@ -31,15 +31,16 @@ class import_cldr(Command):
 
 
 setup(
-    name='Babel',
-    version='2.0-dev',
+    name='Babel-lex',
+    version='2.0-lex',
     description='Internationalization utilities',
     long_description=\
-"""A collection of tools for internationalizing Python applications.""",
-    author='Armin Ronacher',
-    author_email='armin.ronacher@active-4.com',
+"""A collection of tools for internationalizing Python applications.\n
+A fork of Babel, with support for the latest CLDR version, and more...""",
+    author='Béranger Enselme',
+    author_email='benselme@gmail.com',
     license='BSD',
-    url='http://babel.pocoo.org/',
+    url='https://github.com/benselme/babel',
 
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -52,6 +53,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     packages=['babel', 'babel.messages', 'babel.localtime'],
